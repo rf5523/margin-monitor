@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>融資水位儀表板</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--text:#1d2330;--sub:#6b7385;--watch:#2e9e5b;--danger:#e8890c;--extreme:#d62c2c}
+@media (prefers-color-scheme:dark){:root{--bg:#14171d;--card:#1e232c;--text:#e8ebf1;--sub:#8c95a8}}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,"Noto Sans TC",sans-serif}
+.wrap{max-width:900px;margin:0 auto;padding:24px 16px}
+h1{font-size:20px;margin:0 0 16px}
+.card{background:var(--card);border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.gauge{display:flex;flex-direction:column;align-items:center}
+.big{font-size:64px;font-weight:700;line-height:1}
+.badge{margin-top:10px;padding:6px 22px;border-radius:999px;color:#fff;font-size:20px;font-weight:600}
+.watch{background:var(--watch)}.danger{background:var(--danger)}.extreme{background:var(--extreme);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.7}}
+.bar{position:relative;height:16px;border-radius:8px;margin:26px 0 6px;width:100%;
+background:linear-gradient(90deg,var(--watch) 0 65%,var(--danger) 65% 75%,var(--extreme) 75% 100%)}
+.pin{position:absolute;top:-6px;width:4px;height:28px;background:var(--text);border-radius:2px;transform:translateX(-2px)}
+.scale{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);width:100%}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.k{font-size:13px;color:var(--sub)}.v{font-size:22px;font-weight:600;margin-top:2px}
+.foot{font-size:12px;color:var(--sub);text-align:center;margin-top:8px;line-height:1.6}
+</style></head><body><div class="wrap">
+<h1>融資餘額 vs 加權指數 風險儀表板</h1>
+<div class="card gauge">
+  <div class="k" id="date">載入中…</div>
+  <div class="big" id="diff">—</div>
+  <div class="badge watch" id="badge">—</div>
+  <div class="bar"><div class="pin" id="pin" style="left:0"></div></div>
+  <div class="scale"><span>0</span><span>26 危險</span><span>30 極度危險</span><span>40</span></div>
+</div>
+<div class="card grid">
+  <div><div class="k">融資餘額（億）</div><div class="v" id="margin">—</div></div>
+  <div><div class="k">X = 融資餘額/2100</div><div class="v" id="x">—</div></div>
+  <div><div class="k">加權指數</div><div class="v" id="index">—</div></div>
+  <div><div class="k">Y = 指數/17306</div><div class="v" id="y">—</div></div>
+</div>
+<div class="card"><canvas id="chart" height="110"></canvas></div>
+<div class="foot">資料來源：臺灣證券交易所，每個交易日晚間約 22:00 更新。<br>
+X−Y ≥ 30 極度危險、≥ 26 危險、&lt; 26 觀察。本頁僅供參考，不構成任何投資建議。</div>
+</div>
+<script>
+const COL={watch:'#2e9e5b',danger:'#e8890c',extreme:'#d62c2c'};
+const $=id=>document.getElementById(id);
+async function load(){
+  let data;
+  try{ data=await (await fetch('data.json?t='+Date.now())).json(); }
+  catch(e){ $('date').textContent='尚無資料'; return; }
+  const rows=Object.keys(data).sort().map(k=>data[k]).slice(-90);
+  if(!rows.length){ $('date').textContent='尚無資料'; return; }
+  const r=rows[rows.length-1];
+  $('date').textContent='資料日期：'+r.date;
+  $('diff').textContent=r.diff.toFixed(2);
+  $('badge').textContent=r.label; $('badge').className='badge '+r.level;
+  $('pin').style.left=Math.min(Math.max(r.diff/40*100,0),100)+'%';
+  $('margin').textContent=r.margin.toLocaleString();
+  $('x').textContent=r.x.toFixed(2)+'%';
+  $('index').textContent=r.index.toLocaleString();
+  $('y').textContent=r.y.toFixed(2)+'%';
+  const line=v=>({data:rows.map(()=>v),borderDash:[6,4],pointRadius:0,borderWidth:1});
+  new Chart($('chart'),{type:'line',data:{labels:rows.map(a=>a.date.slice(5)),datasets:[
+    {label:'X−Y',data:rows.map(a=>a.diff),borderColor:'#4a6cf7',tension:.2,
+     pointBackgroundColor:rows.map(a=>COL[a.level]),pointRadius:4},
+    {label:'危險 26',borderColor:COL.danger,...line(26)},
+    {label:'極度危險 30',borderColor:COL.extreme,...line(30)}]},
+    options:{plugins:{legend:{position:'bottom'}}}});
+}
+load();
+</script></body></html>
