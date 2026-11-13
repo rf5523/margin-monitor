@@ -1,0 +1,22 @@
+name: notify-line
+
+# 每天 23:00 台北時間發送( GitHub Actions 的 cron 用 UTC,23:00 CST = 15:00 UTC)。
+# 資料更新 workflow 是 22:00 台北時間跑,所以 23:00 時今天的資料已經寫進 docs/data.json 了。
+on:
+  schedule:
+    - cron: "0 15 * * *"
+  workflow_dispatch:   # 手動測試:Actions 分頁 -> notify-line -> Run workflow
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Send LINE notification
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: python notify_line.py
