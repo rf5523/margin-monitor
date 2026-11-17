@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>融資水位儀表板</title>
+<style>
+  :root { --green:#1a7f37; --orange:#c77700; --red:#cf222e; --ink:#24292f; --muted:#57606a; --line:#d0d7de; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif; color:var(--ink); margin:0; background:#f6f8fa; }
+  .wrap { max-width:860px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:24px; margin:4px 0 2px; }
+  .sub { color:var(--muted); font-size:14px; margin:0 0 20px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px; margin-bottom:16px; }
+  .badge { display:inline-block; font-size:28px; font-weight:800; padding:6px 18px; border-radius:999px; color:#fff; }
+  .badge.watch { background:var(--green); } .badge.danger { background:var(--orange); } .badge.extreme { background:var(--red); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-top:16px; }
+  .stat b { display:block; font-size:22px; } .stat span { color:var(--muted); font-size:13px; }
+  .diff { font-size:40px; font-weight:800; margin:8px 0 0; }
+  .rule { font-size:14px; color:var(--muted); line-height:1.9; }
+  .rule b { color:var(--ink); }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:right; padding:8px 6px; border-bottom:1px solid var(--line); }
+  th:first-child, td:first-child { text-align:left; }
+  .pill { display:inline-block; padding:2px 10px; border-radius:999px; color:#fff; font-size:12px; }
+  .pill.watch { background:var(--green); } .pill.danger { background:var(--orange); } .pill.extreme { background:var(--red); }
+  #chart { width:100%; height:auto; display:block; }
+  .foot { color:var(--muted); font-size:13px; line-height:1.8; }
+  .err { color:var(--red); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>融資水位儀表板</h1>
+  <p class="sub">融資餘額 / 2100 − 加權指數 / 17306 ＝ 水位差（百分點）・資料來源：<a href="https://www.twse.com.tw/dashboard/zh/credit/margin.html" target="_blank" rel="noopener">臺灣證券交易所</a></p>
+
+  <div class="card" id="latest"><p>載入中…</p></div>
+
+  <div class="card">
+    <h2 style="font-size:17px;margin:0 0 8px">水位差走勢</h2>
+    <svg id="chart" viewBox="0 0 820 260" role="img" aria-label="水位差走勢圖"></svg>
+    <p class="rule">虛線為警戒線：<b style="color:var(--orange)">26 危險</b>、<b style="color:var(--red)">30 極度危險</b>。低於 26 為觀察。</p>
+  </div>
+
+  <div class="card">
+    <h2 style="font-size:17px;margin:0 0 8px">判讀規則</h2>
+    <p class="rule" style="margin:0">
+      X ＝ 融資餘額（億）÷ 2100 × 100　　Y ＝ 加權指數 ÷ 17306 × 100<br>
+      <b>水位差 ＝ X − Y</b><br>
+      差值 ≥ 30 → <b style="color:var(--red)">極度危險</b>　｜　差值 ≥ 26 → <b style="color:var(--orange)">危險</b>　｜　差值 &lt; 26 → <b style="color:var(--green)">觀察</b><br>
+      這是融資相對指數「超漲」的程度，不是預測漲跌；訊號出現時先檢查部位與風險，不要單憑一個數字進出。
+    </p>
+  </div>
+
+  <div class="card">
+    <h2 style="font-size:17px;margin:0 0 8px">歷史紀錄（最新 30 筆）</h2>
+    <div id="history"><p>載入中…</p></div>
+  </div>
+
+  <p class="foot">每天 22:00（台北）由 GitHub Actions 自動從證交所更新，23:00 用 LINE 推播最新結果。休市或尚未公布時，推播與儀表板顯示最近一筆並註明日期。<br>
+  原始資料：<a href="data.json">data.json</a>（公開 JSON）</p>
+</div>
+<script>
+async function main() {
+  let data;
+  try {
+    const res = await fetch('data.json', { cache: 'no-store' });
+    data = await res.json();
+  } catch (e) {
+    document.getElementById('latest').innerHTML = '<p class="err">讀不到 data.json，請確認檔案已上傳到 docs/ 且 GitHub Pages 已開啟。</p>';
+    document.getElementById('history').innerHTML = '';
+    return;
+  }
+  const dates = Object.keys(data).sort();
+  if (!dates.length) {
+    document.getElementById('latest').innerHTML = '<p>還沒有資料，今晚 22:00 第一次自動更新後就會出現。</p>';
+    document.getElementById('history').innerHTML = '';
+    return;
+  }
+  const recs = dates.map(d => data[d]);
+  const last = recs[recs.length - 1];
+  const fmt = n => Number(n).toLocaleString('zh-Hant-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  document.getElementById('latest').innerHTML =
+    '<div><span class="badge ' + last.level + '">' + last.label + '</span> ' +
+    '<span style="color:var(--muted)">　' + last.date + '</span></div>' +
+    '<div class="diff">' + (last.diff >= 0 ? '+' : '') + fmt(last.diff) + '</div>' +
+    '<div class="grid">' +
+    '<div class="stat"><b>' + fmt(last.margin) + ' 億</b><span>融資餘額</span></div>' +
+    '<div class="stat"><b>' + fmt(last.index) + '</b><span>加權指數</span></div>' +
+    '<div class="stat"><b>' + fmt(last.x) + '%</b><span>X ＝ 融資 ÷ 2100</span></div>' +
+    '<div class="stat"><b>' + fmt(last.y) + '%</b><span>Y ＝ 指數 ÷ 17306</span></div>' +
+    '</div>';
+
+  // 折線圖：水位差，含 26 / 30 警戒線（純 SVG，不依賴外部套件）
+  const W = 820, H = 260, P = { l: 46, r: 12, t: 14, b: 26 };
+  const vals = recs.map(r => r.diff);
+  let lo = Math.min(0, ...vals, 24), hi = Math.max(32, ...vals);
+  const X = i => P.l + (W - P.l - P.r) * (recs.length === 1 ? 0.5 : i / (recs.length - 1));
+  const Y = v => P.t + (H - P.t - P.b) * (1 - (v - lo) / (hi - lo));
+  const line = (v, color, dash) =>
+    '<line x1="' + P.l + '" y1="' + Y(v) + '" x2="' + (W - P.r) + '" y2="' + Y(v) + '" stroke="' + color + '" stroke-width="1.5" stroke-dasharray="' + dash + '"/>' +
+    '<text x="' + (W - P.r) + '" y="' + (Y(v) - 5) + '" text-anchor="end" font-size="11" fill="' + color + '">' + v + '</text>';
+  const pts = recs.map((r, i) => X(i).toFixed(1) + ',' + Y(r.diff).toFixed(1)).join(' ');
+  const dots = recs.map((r, i) =>
+    '<circle cx="' + X(i) + '" cy="' + Y(r.diff) + '" r="3" fill="' +
+    (r.level === 'extreme' ? '#cf222e' : r.level === 'danger' ? '#c77700' : '#1a7f37') + '">' +
+    '<title>' + r.date + '：' + (r.diff >= 0 ? '+' : '') + r.diff + '（' + r.label + '）</title></circle>').join('');
+  document.getElementById('chart').innerHTML =
+    line(30, '#cf222e', '6 4') + line(26, '#c77700', '6 4') +
+    '<polyline points="' + pts + '" fill="none" stroke="#0969da" stroke-width="2"/>' + dots +
+    '<text x="' + P.l + '" y="' + (H - 6) + '" font-size="11" fill="#57606a">' + recs[0].date + '</text>' +
+    '<text x="' + (W - P.r) + '" y="' + (H - 6) + '" text-anchor="end" font-size="11" fill="#57606a">' + last.date + '</text>';
+
+  const rows = recs.slice(-30).reverse().map(r =>
+    '<tr><td>' + r.date + '</td><td>' + fmt(r.margin) + '</td><td>' + fmt(r.index) + '</td>' +
+    '<td>' + (r.diff >= 0 ? '+' : '') + fmt(r.diff) + '</td>' +
+    '<td><span class="pill ' + r.level + '">' + r.label + '</span></td></tr>').join('');
+  document.getElementById('history').innerHTML =
+    '<table><thead><tr><th>日期</th><th>融資餘額（億）</th><th>加權指數</th><th>水位差</th><th>訊號</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+main();
+</script>
+</body>
+</html>
