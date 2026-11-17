@@ -1,0 +1,22 @@
+name: notify-line
+
+# 每天 23:00 台北時間用 LINE 推播最新結果
+# 23:00 台北 = 15:00 UTC。接在 22:00 的 update workflow 之後跑。
+on:
+  schedule:
+    - cron: "0 15 * * *"
+  workflow_dispatch:  # 手動測試:Actions 分頁 -> notify-line -> Run workflow(會真的發送)
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: LINE 推播
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: python notify_line.py
